@@ -117,13 +117,13 @@ jobs:
         run: |
           echo "开始部署到 ${{ github.event.inputs.environment || 'production' }} 环境"
           # 添加您的部署脚本
-          # 例如：kubectl apply、terraform apply 等
+          # 例如: kubectl apply、terraform apply 等
 
       - name: Health check
         run: |
           echo "执行健康检查..."
           # 添加健康检查脚本
-          # 例如：curl 检查服务状态
+          # 例如: curl 检查服务状态
 
   # 通知部署结果
   notify:
