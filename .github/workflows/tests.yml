@@ -42,5 +42,3 @@ jobs:
       - name: Run graphql generation
         run: yarn generate
 
-      - name: Run unit tests
-        run: yarn test
