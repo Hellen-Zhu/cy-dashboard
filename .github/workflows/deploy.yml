@@ -108,7 +108,7 @@ jobs:
   deploy:
     needs: build-and-push-images
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
     
     steps:
       - name: Checkout code
