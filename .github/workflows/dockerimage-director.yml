@@ -3,7 +3,7 @@ name: Update Director Dockerhub Image
 on:
   push:
     branches:
-      - master
+      - main
     tags:
       - v*
 

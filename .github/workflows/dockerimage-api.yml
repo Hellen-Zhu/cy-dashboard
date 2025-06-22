@@ -3,10 +3,10 @@ name: Update API Dockerhub Images
 on:
   push:
     branches:
-      - master
+      - main
     tags:
       - v*
-
+      
 jobs:
   build:
     runs-on: ubuntu-latest

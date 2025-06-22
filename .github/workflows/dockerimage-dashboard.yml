@@ -3,7 +3,7 @@ name: Update Dashboard Dockerhub Images
 on:
   push:
     branches:
-      - master
+      - main
     tags:
       - v*
 
