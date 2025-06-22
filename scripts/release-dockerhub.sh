@@ -13,7 +13,7 @@ function isGitTag() {
 }
 
 function isOnMaster() {
-  [ "${BRANCH}" = "master" ]
+  [ "${BRANCH}" = "main" ]
 }
 
 function getCleanTags() {
