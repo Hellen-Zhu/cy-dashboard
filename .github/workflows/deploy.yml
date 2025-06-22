@@ -119,6 +119,17 @@ jobs:
           echo "部署环境: ${{ github.event.inputs.environment || 'production' }}"
           echo "强制重建: ${{ github.event.inputs.force_rebuild || 'false' }}"
 
+      - name: Install Docker Compose
+        run: |
+          echo "安装Docker Compose..."
+          # 安装Docker Compose v2
+          sudo apt-get update
+          sudo apt-get install -y docker-compose-plugin
+          
+          # 验证安装
+          docker compose version
+          echo "✅ Docker Compose安装完成"
+
       - name: Setup Docker Compose
         run: |
           echo "设置Docker Compose环境"
@@ -143,14 +154,14 @@ jobs:
         run: |
           echo "开始部署到 ${{ github.event.inputs.environment || 'production' }} 环境"
           # 拉取最新镜像
-          docker-compose pull
+          docker compose pull
           
           # 启动服务
-          docker-compose up -d
+          docker compose up -d
           echo "✅ 服务已启动"
           
           # 显示服务状态
-          docker-compose ps
+          docker compose ps
 
       - name: Health check
         run: |
@@ -159,7 +170,7 @@ jobs:
           
           # 检查MongoDB
           echo "检查MongoDB..."
-          docker-compose exec -T mongo mongosh --eval "db.runCommand('ping')" || echo "MongoDB检查失败"
+          docker compose exec -T mongo mongosh --eval "db.runCommand('ping')" || echo "MongoDB检查失败"
           
           # 检查Director服务
           echo "检查Director服务..."
