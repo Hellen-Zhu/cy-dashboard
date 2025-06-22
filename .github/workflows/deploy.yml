@@ -73,6 +73,8 @@ jobs:
     strategy:
       matrix:
         service: [api, dashboard, director]
+    env:
+      DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     
     steps:
       - name: Checkout code

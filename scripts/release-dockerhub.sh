@@ -44,6 +44,7 @@ function getTagsArg() {
 }
 
 function dockerBuildAndPush() {
+  DOCKER_USERNAME=${DOCKER_USERNAME:-"hellen-zhu"}
   echo 🔨 Building ${2} from ${1}
   echo docker buildx build --file ${1}/Dockerfile --platform=linux/arm64/v8,linux/amd64 $(getTagsArg ${2}) --provenance=false --push
   echo ========================
@@ -78,7 +79,7 @@ echo 🚀 Releasing tags: $TAGS
 echo ========================
 
 
-dockerBuildAndPush "packages/${service}" "agoldis/sorry-cypress-${service}"
+dockerBuildAndPush "packages/${service}" "${DOCKER_USERNAME:-hellen-zhu}/cy-dashboard-${service}"
 
 echo ========================
 echo 🎉 Released to Dockerhub: $TAGS
