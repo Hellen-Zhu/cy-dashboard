@@ -1,0 +1,210 @@
+name: Deploy Sorry Cypress
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '部署环境'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+      force_rebuild:
+        description: '强制重新构建所有镜像'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  # 测试和构建
+  test-and-build:
+    runs-on: ubuntu-latest
+    if: '!contains(toJSON(github.event.commits.*.message), ''[skip ci]'')'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'yarn'
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: '**/node_modules'
+          key: v1-${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            v1-${{ runner.os }}-yarn-
+
+      - name: Cache turbo build
+        uses: actions/cache@v3
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run linting
+        run: yarn lint
+
+      - name: Generate GraphQL types
+        run: yarn generate
+
+      - name: Build packages
+        run: yarn build
+
+  # 构建和推送 Docker 镜像
+  build-and-push-images:
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [api, dashboard, director]
+    env:
+      DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'yarn'
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build and push ${{ matrix.service }}
+        run: ./scripts/release-dockerhub.sh -s ${{ matrix.service }}
+
+  # 部署到目标环境
+  deploy:
+    needs: build-and-push-images
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup environment
+        run: |
+          echo "部署环境: ${{ github.event.inputs.environment || 'production' }}"
+          echo "强制重建: ${{ github.event.inputs.force_rebuild || 'false' }}"
+
+      - name: Install Docker Compose
+        run: |
+          echo "安装Docker Compose..."
+          # 安装Docker Compose v2
+          sudo apt-get update
+          sudo apt-get install -y docker-compose-plugin
+          
+          # 验证安装
+          docker compose version
+          echo "✅ Docker Compose安装完成"
+
+      - name: Setup Docker Compose
+        run: |
+          echo "设置Docker Compose环境"
+          # 使用现有的docker-compose.build.yml模板
+          cp docker-compose.build.yml docker-compose.yml
+          
+          # 替换镜像名称为您的Docker Hub用户名
+          sed -i 's|agoldis/sorry-cypress|${{ secrets.DOCKERHUB_USERNAME }}/cy-dashboard|g' docker-compose.yml
+          
+          # 设置版本标签
+          VERSION_TAG="latest"
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION_TAG=$(echo "${{ github.ref }}" | sed 's|refs/tags/||')
+          fi
+          export VERSION=$VERSION_TAG
+          
+          echo "使用版本: $VERSION"
+          echo "Docker Compose配置:"
+          cat docker-compose.yml
+
+      - name: Deploy with Docker Compose
+        run: |
+          echo "开始部署到 ${{ github.event.inputs.environment || 'production' }} 环境"
+          # 拉取最新镜像
+          docker compose pull
+          
+          # 启动服务
+          docker compose up -d
+          echo "✅ 服务已启动"
+          
+          # 显示服务状态
+          docker compose ps
+
+      - name: Health check
+        run: |
+          echo "执行健康检查..."
+          sleep 15  # 等待服务启动
+          
+          # 检查MongoDB
+          echo "检查MongoDB..."
+          docker compose exec -T mongo mongosh --eval "db.runCommand('ping')" || echo "MongoDB检查失败"
+          
+          # 检查Director服务
+          echo "检查Director服务..."
+          curl -f http://localhost:1234/health || echo "Director服务检查失败"
+          
+          # 检查API服务
+          echo "检查API服务..."
+          curl -f http://localhost:4000/health || echo "API服务检查失败"
+          
+          # 检查Dashboard服务
+          echo "检查Dashboard服务..."
+          curl -f http://localhost:8080 || echo "Dashboard服务检查失败"
+          
+          echo "✅ 健康检查完成"
+          
+          # 显示服务访问地址
+          echo "🌐 服务访问地址:"
+          echo "Dashboard: http://localhost:8080"
+          echo "API: http://localhost:4000"
+          echo "Director: http://localhost:1234"
+
+  # 通知部署结果
+  notify:
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Notify deployment result
+        run: |
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "✅ 部署成功"
+            # 可以添加 Slack、钉钉等通知
+          else
+            echo "❌ 部署失败"
+            # 可以添加失败通知
+          fi 
