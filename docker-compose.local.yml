@@ -10,7 +10,7 @@ services:
     image: mongo:4.4
     environment:
       MONGO_INITDB_ROOT_USERNAME: 'admin'
-      MONGO_INITDB_ROOT_PASSWORD: 'password'
+      MONGO_INITDB_ROOT_PASSWORD: 'password123'
     volumes:
       - ./data/data-mongo-cypress:/data/db
     ports:
@@ -20,7 +20,7 @@ services:
     environment:
       DASHBOARD_URL: http://localhost:8081
       EXECUTION_DRIVER: '../execution/mongo/driver'
-      MONGODB_URI: 'mongodb://admin:password@mongo:27017'
+      MONGODB_URI: 'mongodb://admin:password123@mongo:27017'
       MONGODB_DATABASE: 'sorry-cypress'
 
       SCREENSHOTS_DRIVER: '../screenshots/minio.driver'
@@ -43,7 +43,7 @@ services:
   api:
     image: agoldis/sorry-cypress-api:latest
     environment:
-      MONGODB_URI: 'mongodb://admin:password@mongo:27017'
+      MONGODB_URI: 'mongodb://admin:password123@mongo:27017'
       MONGODB_DATABASE: 'sorry-cypress'
       APOLLO_PLAYGROUND: 'false'
     ports:
@@ -82,8 +82,8 @@ services:
     entrypoint: >
       /bin/sh -c "
       sleep 3;
-      /usr/bin/mc config host add myminio http://localhost:9000 minioadmin minioadmin;
-      /usr/bin/mc rm -r --dangerous --force myminio/sorry-cypress;
+      /usr/bin/mc alias set myminio http://localhost:9090 minioadmin minioadmin;
+      /usr/bin/mc rm -r --dangerous --force myminio/sorry-cypress || true;
       /usr/bin/mc mb myminio/sorry-cypress;
       /usr/bin/mc anonymous set download myminio/sorry-cypress;
       /usr/bin/mc anonymous set public myminio/sorry-cypress;

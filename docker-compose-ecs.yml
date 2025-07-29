@@ -1,0 +1,85 @@
+version: '3.8'
+services:
+  mongo:
+    image: mongo:4.4
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: 'admin'
+      MONGO_INITDB_ROOT_PASSWORD: 'password123'
+    volumes:
+      - ./data/data-mongo-cypress:/data/db
+    ports:
+      - 27017:27017
+  director:
+    image: agoldis/sorry-cypress-director:latest
+    environment:
+      DASHBOARD_URL: http://47.97.45.91:8080
+      EXECUTION_DRIVER: '../execution/mongo/driver'
+      MONGODB_URI: 'mongodb://admin:password123@mongo:27017'
+      MONGODB_DATABASE: 'sorry-cypress'
+
+      SCREENSHOTS_DRIVER: '../screenshots/minio.driver'
+      GITLAB_JOB_RETRIES: 'false'
+      MINIO_ACCESS_KEY: 'minioadmin'
+      MINIO_SECRET_KEY: 'password123'
+      MINIO_ENDPOINT: '47.97.45.91'
+      MINIO_URL: 'http://47.97.45.91'
+      MINIO_PORT: '9000'
+      MINIO_USESSL: 'false'
+      MINIO_BUCKET: sorry-cypress
+      PROBE_LOGGER: "false"
+    ports:
+      - 1234:1234
+      - 9000:9000
+      - 9090:9090
+    depends_on:
+      - mongo
+
+  api:
+    image: agoldis/sorry-cypress-api:latest
+    environment:
+      MONGODB_URI: 'mongodb://admin:password123@mongo:27017'
+      MONGODB_DATABASE: 'sorry-cypress'
+      APOLLO_PLAYGROUND: .true.
+    ports:
+      - 4000:4000
+    depends_on:
+      - mongo
+
+  dashboard:
+    image: agoldis/sorry-cypress-dashboard:latest
+    environment:
+      GRAPHQL_SCHEMA_URL: http://47.97.45.91:4000
+      GRAPHQL_CLIENT_CREDENTIALS: ''
+      PORT: 8080
+      CI_URL: ''
+    ports:
+      - 8080:8080
+    depends_on:
+      - mongo
+      - api
+
+  storage:
+    image: minio/minio
+    network_mode: service:director
+    environment:
+      MINIO_ROOT_USER: 'minioadmin'
+      MINIO_ROOT_PASSWORD: 'password123'
+    volumes:
+      - ./data/data-minio-cypress:/data
+    command: minio server --console-address ":9090" /data
+
+  createbuckets:
+    image: minio/mc
+    network_mode: service:director
+    depends_on:
+      - storage
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+      /usr/bin/mc config host add myminio http://47.97.45.91:9090 minioadmin password123;
+      /usr/bin/mc rm -r --dangerous --force myminio/sorry-cypress;
+      /usr/bin/mc mb myminio/sorry-cypress;
+      /usr/bin/mc anonymous set download myminio/sorry-cypress;
+      /usr/bin/mc anonymous set public myminio/sorry-cypress;
+      exit 0;
+      "

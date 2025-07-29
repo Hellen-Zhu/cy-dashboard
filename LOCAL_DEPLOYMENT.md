@@ -112,3 +112,7 @@ yarn dev
 ```
 
 这将启动所有服务的开发版本，支持热重载。 
+
+### usage
+ To migrate with cypress 13.xx
+https://docs.currents.dev/resources/reporters/cypress-cloud/migration-to-cypress-13
